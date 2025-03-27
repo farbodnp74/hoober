@@ -1,0 +1,148 @@
+version: '3.8'
+
+services:
+  job:
+    build:
+      context: ./job
+    depends_on:
+      - gateway
+      - rabbitmq
+      - database
+      - cache
+      - storage
+    restart: always
+    ports:
+      - "3000:3000"
+    networks:
+      - hoober
+    env_file:
+      - .env
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: '2G'
+
+  asset:
+    build:
+      context: ./asset
+    depends_on:
+      - gateway
+      - rabbitmq
+      - database
+      - cache
+      - storage
+    restart: always
+    env_file:
+      - .env
+    ports:
+      - "3003:3003"
+    networks:
+      - hoober
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: '1G'
+
+  gateway:
+    build:
+      context: ./gateway
+    depends_on:
+      - rabbitmq
+      - database
+      - cache
+      - storage
+    restart: always
+    ports:
+      - "3009:3009"
+    networks:
+      - hoober
+    env_file:
+      - .env
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: '1G'
+
+  rabbitmq:
+    image: "rabbitmq:3.12.13-management-alpine"
+    restart: always
+    ports:
+      - '5672:5672'
+      - '15672:15672'
+    networks:
+      - hoober
+    env_file:
+      - .env
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: '1G'
+
+  database:
+    image: postgres:15.6-alpine
+    ports:
+      - "5432:5432"
+    env_file:
+      - .env
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+      - ./docker/create_db.sql:/docker-entrypoint-initdb.d/create_db.sql
+    networks:
+      - hoober
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: '1G'
+
+  cache:
+    image: redis:latest
+    restart: always
+    ports:
+      - "6378:6379"
+    networks:
+      - hoober
+    volumes:
+      - ./redis.conf:/usr/local/etc/redis/redis.conf
+    command: redis-server /usr/local/etc/redis/redis.conf --requirepass ${REDIS_PASSWORD}
+    env_file:
+      - .env
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: '512M'
+
+  storage:
+    image: quay.io/minio/minio
+    expose:
+      - "9000"
+      - "9001"
+    env_file:
+      - .env
+    volumes:
+      - ./asset/files:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+    command: server /data --console-address ":9001"
+    networks:
+      - hoober
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: '1G'
+
+volumes:
+  pg_data:
+
+networks:
+  hoober:
+    external: true

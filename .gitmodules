@@ -1,0 +1,6 @@
+[submodule "jobs"]
+	path = jobs
+	url = https://github.com/farbodnp74/hoober-job.git
+[submodule "gateways"]
+	path = gateways
+	url = https://github.com/farbodnp74/hoober-gateway.git
